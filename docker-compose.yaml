@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  backend:
+    build: 
+      context: ./server
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=postgres://postgres:password@db:5432/minesweeper
+    depends_on:
+      - db
+
+  frontend:
+    build: 
+      context: ./client
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:3001
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=minesweeper
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

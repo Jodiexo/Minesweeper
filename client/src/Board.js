@@ -3,7 +3,7 @@ import Cell from './Cell';
 
 const Board = ({ board, onCellClick, onCellRightClick }) => {
   const handleContextMenu = (e) => {
-    e.preventDefault(); // Prevent the default right-click menu
+    e.preventDefault();
   };
 
   return (

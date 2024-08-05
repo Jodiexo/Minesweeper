@@ -1,11 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import MinesweeperGame from './GameLogic';
+import Login from './Login';
 import './App.css';
 
 function App() {
+  const [user, setUser] = useState(null);
+
   return (
     <div className="App">
-      <MinesweeperGame />
+      {user ? (
+        <MinesweeperGame user={user} />
+      ) : (
+        <Login onLogin={setUser} />
+      )}
     </div>
   );
 }

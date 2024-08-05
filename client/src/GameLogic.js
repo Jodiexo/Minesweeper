@@ -1,16 +1,55 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Board from './Board';
+import { API_URL } from './Config';
 
-const BOARD_SIZE = 10;
-const NUM_MINES = 15;
 
-const MinesweeperGame = () => {
+const DIFFICULTIES = {
+  easy: { size: 10, mines: 10 },
+  medium: { size: 16, mines: 40 },
+  hard: { size: 20, mines: 80 }
+};
+
+const MinesweeperGame = ({ user }) => {
+  const [difficulty, setDifficulty] = useState('easy');
   const [board, setBoard] = useState([]);
-  const [gameStatus, setGameStatus] = useState('playing'); // 'playing', 'won', 'lost'
+  const [gameStatus, setGameStatus] = useState('ready'); // 'ready', 'playing', 'won', 'lost'
+    const [timer, setTimer] = useState(0);
+     const [topTime, setTopTime] = useState(null);
+   const [recentGames, setRecentGames] = useState([]);
+    
+    
+ useEffect(() => {
+    fetchUserData();
+  }, [user]);
+
+  const fetchUserData = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/users/${user.username}}`);
+      const data = await response.json();
+      if (data.top_time) {
+        setTopTime(data.top_time);
+        setDifficulty(data.difficulty);
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+    const updateUserData = async (newTopTime) => {
+    try {
+      await fetch(`http://localhost:3000/api/users/${user.username}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ top_time: newTopTime, difficulty }),
+      });
+    } catch (error) {
+      console.error('Error updating user data:', error);
+    }
+  };
 
   const createBoard = useCallback(() => {
-    const newBoard = Array.from({ length: BOARD_SIZE }, () =>
-      Array.from({ length: BOARD_SIZE }, () => ({
+    const { size, mines } = DIFFICULTIES[difficulty];
+    const newBoard = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => ({
         isMine: false,
         isRevealed: false,
         isFlagged: false,
@@ -20,9 +59,9 @@ const MinesweeperGame = () => {
 
     // Place mines
     let minesPlaced = 0;
-    while (minesPlaced < NUM_MINES) {
-      const row = Math.floor(Math.random() * BOARD_SIZE);
-      const col = Math.floor(Math.random() * BOARD_SIZE);
+    while (minesPlaced < mines) {
+      const row = Math.floor(Math.random() * size);
+      const col = Math.floor(Math.random() * size);
       if (!newBoard[row][col].isMine) {
         newBoard[row][col].isMine = true;
         minesPlaced++;
@@ -30,17 +69,17 @@ const MinesweeperGame = () => {
     }
 
     // Calculate neighbor mines
-    for (let row = 0; row < BOARD_SIZE; row++) {
-      for (let col = 0; col < BOARD_SIZE; col++) {
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
         if (!newBoard[row][col].isMine) {
           let count = 0;
           for (let i = -1; i <= 1; i++) {
             for (let j = -1; j <= 1; j++) {
               if (
                 row + i >= 0 &&
-                row + i < BOARD_SIZE &&
+                row + i < size &&
                 col + j >= 0 &&
-                col + j < BOARD_SIZE &&
+                col + j < size &&
                 newBoard[row + i][col + j].isMine
               ) {
                 count++;
@@ -53,14 +92,25 @@ const MinesweeperGame = () => {
     }
 
     return newBoard;
-  }, []);
+  }, [difficulty]);
 
   useEffect(() => {
     setBoard(createBoard());
   }, [createBoard]);
 
+  useEffect(() => {
+    let interval;
+    if (gameStatus === 'playing') {
+      interval = setInterval(() => {
+        setTimer((prevTimer) => prevTimer + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [gameStatus]);
+
   const revealCell = useCallback((row, col) => {
-    if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE || board[row][col].isRevealed || board[row][col].isFlagged) {
+    const { size } = DIFFICULTIES[difficulty];
+    if (row < 0 || row >= size || col < 0 || col >= size || board[row][col].isRevealed || board[row][col].isFlagged) {
       return;
     }
 
@@ -76,7 +126,7 @@ const MinesweeperGame = () => {
     }
 
     setBoard(newBoard);
-  }, [board]);
+  }, [board, difficulty]);
 
   const toggleFlag = useCallback((row, col) => {
     if (gameStatus !== 'playing' || board[row][col].isRevealed) return;
@@ -87,17 +137,22 @@ const MinesweeperGame = () => {
   }, [board, gameStatus]);
 
   const checkWin = useCallback(() => {
-    for (let row = 0; row < BOARD_SIZE; row++) {
-      for (let col = 0; col < BOARD_SIZE; col++) {
-        if (!board[row][col].isMine && !board[row][col].isRevealed) {
-          return false;
+    const { size, mines } = DIFFICULTIES[difficulty];
+    let revealedCount = 0;
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
+        if (!board[row][col].isMine && board[row][col].isRevealed) {
+          revealedCount++;
         }
       }
     }
-    return true;
-  }, [board]);
+    return revealedCount === size * size - mines;
+  }, [board, difficulty]);
 
   const handleCellClick = useCallback((row, col) => {
+    if (gameStatus === 'ready') {
+      setGameStatus('playing');
+    }
     if (gameStatus !== 'playing') return;
 
     if (board[row][col].isFlagged) return;
@@ -115,18 +170,42 @@ const MinesweeperGame = () => {
       revealCell(row, col);
       if (checkWin()) {
         setGameStatus('won');
+        const newRecentGames = [
+          { difficulty, time: timer },
+          ...recentGames.slice(0, 9)
+        ];
+        setRecentGames(newRecentGames);
       }
     }
-  }, [board, gameStatus, revealCell, checkWin]);
+  }, [board, gameStatus, revealCell, checkWin, difficulty, timer, recentGames]);
 
   const resetGame = () => {
     setBoard(createBoard());
-    setGameStatus('playing');
+    setGameStatus('ready');
+    setTimer(0);
+  };
+
+  const changeDifficulty = (newDifficulty) => {
+    setDifficulty(newDifficulty);
+    resetGame();
   };
 
   return (
     <div className="minesweeper-game">
-      <h1>Minesweeper</h1>
+          <h1>Minesweeper</h1>
+           <div className="user-info">
+        <p>Welcome, {user.username}!</p>
+        <p>Top Time: {topTime ? `${topTime} seconds` : 'N/A'}</p>
+      </div>
+      <div className="controls">
+        <select value={difficulty} onChange={(e) => changeDifficulty(e.target.value)}>
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+        <button onClick={resetGame}>New Game</button>
+        <div className="timer">Time: {timer} seconds</div>
+      </div>
       <Board 
         board={board} 
         onCellClick={handleCellClick} 
@@ -136,7 +215,16 @@ const MinesweeperGame = () => {
         {gameStatus === 'won' && <p>Congratulations! You won!</p>}
         {gameStatus === 'lost' && <p>Game Over! You hit a mine.</p>}
       </div>
-      <button onClick={resetGame}>New Game</button>
+      <div className="recent-games">
+        <h2>Recent Games</h2>
+        <ul>
+          {recentGames.map((game, index) => (
+            <li key={index}>
+              {game.difficulty} - {game.time} seconds
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 };
