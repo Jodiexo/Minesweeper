@@ -1,36 +1,28 @@
-import React, { useState } from 'react';
-import { createBoard, revealCell } from './GameLogic';
+import React from 'react';
+import Cell from './Cell';
 
-const Board = () => {
-  const [board, setBoard] = useState(createBoard());
-  
-  const handleClick = (x, y) => {
-    const newBoard = [...board];
-    revealCell(newBoard, x, y);
-    setBoard(newBoard);
+const Board = ({ board, onCellClick, onCellRightClick }) => {
+  const handleContextMenu = (e) => {
+    e.preventDefault(); // Prevent the default right-click menu
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${board.length}, 30px)` }}>
-      {board.map((row, rowIndex) =>
-        row.map((cell, colIndex) => (
-          <div
-            key={`${rowIndex}-${colIndex}`}
-            onClick={() => handleClick(rowIndex, colIndex)}
-            style={{
-              width: '30px',
-              height: '30px',
-              border: '1px solid black',
-              backgroundColor: cell.wasClicked ? (cell.isBomb ? 'red' : 'lightgray') : 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            {cell.wasClicked && !cell.isBomb ? cell.adjacentBombCount || '' : ''}
-          </div>
-        ))
-      )}
+    <div className="board" onContextMenu={handleContextMenu}>
+      {board.map((row, rowIndex) => (
+        <div key={rowIndex} className="board-row">
+          {row.map((cell, colIndex) => (
+            <Cell
+              key={`${rowIndex}-${colIndex}`}
+              value={cell}
+              onClick={() => onCellClick(rowIndex, colIndex)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onCellRightClick(rowIndex, colIndex);
+              }}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 };

@@ -1,10 +1,13 @@
 import React from 'react';
-import Board from './Board';
+import MinesweeperGame from './GameLogic';
+import './App.css';
 
-const App = () => (
-  <div className="App">
-    <Board />
-  </div>
-);
+function App() {
+  return (
+    <div className="App">
+      <MinesweeperGame />
+    </div>
+  );
+}
 
 export default App;
